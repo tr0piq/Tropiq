@@ -65,7 +65,13 @@ export default function LoginPage() {
         // navigate is handled by onAuthStateChanged
       } catch (err: any) {
         console.error("Google login error:", err);
-        setError(err.message || 'Google Sign-In failed');
+        if (err.code === 'auth/popup-blocked') {
+          setError('Your browser blocked the sign-in popup. Please allow popups for this site in your browser settings, then try again.');
+        } else if (err.code === 'auth/popup-closed-by-user') {
+          setError('Sign-in was cancelled. Please try again.');
+        } else {
+          setError(err.message || 'Google Sign-In failed');
+        }
         setLoading(false);
       }
     } else {

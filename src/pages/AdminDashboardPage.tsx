@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { subscribeToVotes, subscribeToReviews, getProducts, getAllVotes } from '../lib/data-service';
 import type { Poll, Vote, Product } from '../lib/data-service';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
-import { LogOut, ExternalLink, Download, FileSpreadsheet } from 'lucide-react';
+import { LogOut, ExternalLink, Download, FileSpreadsheet, Trophy, Medal, Award, Crown } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
@@ -32,6 +32,12 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'votes' | 'trends' | 'feedbacks' | 'products'>('overview');
   const [products] = useState<Product[]>(getProducts);
   const [reviews, setReviews] = useState<any[]>([]);
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Add Product Form State
   const [newProduct, setNewProduct] = useState({ name: '', description: '', badge: '' });
@@ -126,6 +132,17 @@ export default function AdminDashboardPage() {
   return (
     <div className="min-h-screen bg-[#050505] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        {/* In-page Toast */}
+        {toast && (
+          <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full text-sm font-bold shadow-2xl flex items-center gap-2 transition-all ${
+            toast.type === 'success' ? 'bg-green-500/20 border border-green-500/40 text-green-400' :
+            toast.type === 'error' ? 'bg-red-500/20 border border-red-500/40 text-red-400' :
+            'bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37]'
+          }`}>
+            {toast.type === 'success' ? '✓' : toast.type === 'error' ? '✕' : 'ℹ'} {toast.msg}
+          </div>
+        )}
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 gap-4">
@@ -242,12 +259,16 @@ export default function AdminDashboardPage() {
                 const pct = totalVotes > 0 ? (opt.voteCount / totalVotes) * 100 : 0;
                 const color = optionColors[opt.id] || '#ffffff';
                 const label = optionLabels[opt.id] || opt.label;
-                const medals = ['🥇', '🥈', '🥉'];
+                const RankIcon = rank === 0 ? Trophy : rank === 1 || rank === 2 ? Medal : Award;
+                const rankColor = rank === 0 ? 'text-[#D4AF37]' : rank === 1 ? 'text-gray-300' : rank === 2 ? 'text-amber-600' : 'text-white/40';
+
                 return (
                   <div key={opt.id} className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl">{medals[rank] || '🏅'}</span>
+                        <div className={`p-2 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 ${rankColor}`}>
+                          <RankIcon className="w-6 h-6" />
+                        </div>
                         <div>
                           <p className="font-bold text-white text-lg">{label}</p>
                           {opt.badge && (
@@ -272,7 +293,15 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="flex justify-between mt-2 text-xs text-text-muted">
                       <span>{pct.toFixed(1)}% of total votes</span>
-                      <span style={{ color }}>{rank === 0 ? '👑 Leading' : `+${(activePoll.options[0].voteCount - opt.voteCount)} behind leader`}</span>
+                      <span className="flex items-center gap-1" style={{ color }}>
+                        {rank === 0 ? (
+                          <>
+                            <Crown className="w-3 h-3" /> Leading
+                          </>
+                        ) : (
+                          `+${(activePoll.options[0].voteCount - opt.voteCount)} behind leader`
+                        )}
+                      </span>
                     </div>
                   </div>
                 );
@@ -354,7 +383,7 @@ export default function AdminDashboardPage() {
               <h3 className="text-xl font-bold mb-6">Add New Product</h3>
               <form onSubmit={async (e) => {
                 e.preventDefault();
-                if (!newProduct.name || !imageFile) return alert("Name and Image are required");
+                if (!newProduct.name || !imageFile) return showToast('Product name and image are required.', 'error');
                 setIsUploading(true);
                 try {
                   let imageUrl = '';
@@ -362,7 +391,7 @@ export default function AdminDashboardPage() {
                   // Use ImgBB for image hosting
                   const apiKey = import.meta.env.VITE_IMGBB_API_KEY;
                   if (!apiKey) {
-                    alert("Please add VITE_IMGBB_API_KEY to your .env.local file to use image uploading.");
+                    showToast('VITE_IMGBB_API_KEY is not set in environment variables.', 'error');
                     setIsUploading(false);
                     return;
                   }
@@ -394,10 +423,10 @@ export default function AdminDashboardPage() {
                   
                   setNewProduct({ name: '', description: '', badge: '' });
                   setImageFile(null);
-                  alert("Product added successfully!");
+                  showToast('Product published successfully!', 'success');
                 } catch (err) {
                   console.error(err);
-                  alert("Failed to upload product.");
+                  showToast('Failed to upload product. Please try again.', 'error');
                 }
                 setIsUploading(false);
               }} className="space-y-5">
