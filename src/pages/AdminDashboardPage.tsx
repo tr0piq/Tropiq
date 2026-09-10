@@ -50,7 +50,7 @@ export default function AdminDashboardPage() {
   const handleLogout = async () => {
     if (auth) await signOut(auth);
     sessionStorage.removeItem('tropiq-admin');
-    navigate('/admin/login');
+    navigate('/login');
   };
 
   const activePoll = polls[0];

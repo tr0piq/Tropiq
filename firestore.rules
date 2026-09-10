@@ -2,10 +2,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Votes collection: anyone can read, only authenticated users can write
+    // Votes: anyone can read and vote (auth optional so vote never fails)
     match /votes/{voteId} {
       allow read: if true;
-      allow create: if request.auth != null;
+      allow create: if true;
     }
     // Reviews collection: anyone can read, only authenticated users can write
     match /reviews/{reviewId} {

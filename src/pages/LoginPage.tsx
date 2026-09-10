@@ -29,25 +29,16 @@ export default function LoginPage() {
 
     if (isFirebaseConfigured() && auth) {
       try {
-        const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
-        try {
-          await signInWithEmailAndPassword(auth, email, password);
-          navigate('/vote');
-        } catch (signInErr: any) {
-          // If user doesn't exist, try to sign them up instead!
-          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
-            try {
-              await createUserWithEmailAndPassword(auth, email, password);
-              navigate('/vote');
-            } catch (signUpErr: any) {
-              setError(signUpErr.message || 'Failed to create an account.');
-            }
-          } else {
-            setError(signInErr.message || 'Invalid credentials');
-          }
+        const { signInWithEmailAndPassword } = await import('firebase/auth');
+        await signInWithEmailAndPassword(auth, email, password);
+        navigate('/vote');
+      } catch (signInErr: any) {
+        const code = signInErr.code;
+        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+          setError('Invalid email or password.');
+        } else {
+          setError(signInErr.message || 'Authentication error');
         }
-      } catch (err) {
-        setError((err as Error).message || 'Authentication error');
       }
     } else {
       // Demo Mode

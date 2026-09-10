@@ -170,17 +170,7 @@ export async function castVote(pollId: string, optionId: string) {
     timestamp: Timestamp.now(),
     voterHash
   });
-
-  // 2. Trigger Next.js API Route to Sync with Google Sheets
-  try {
-    await fetch('/api/vote', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pollId, optionId, voterHash, timestamp: new Date().toISOString() })
-    });
-  } catch (err) {
-    console.error("Failed to sync with Google Sheets", err);
-  }
+  // Vote saved to Firestore — no additional sync needed
 }
 
 // Admin Chart Data Fetching
