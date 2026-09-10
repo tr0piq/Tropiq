@@ -97,6 +97,28 @@ export default function LoginPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Please enter your email address first to reset password.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    
+    if (isFirebaseConfigured() && auth) {
+      try {
+        const { sendPasswordResetEmail } = await import('firebase/auth');
+        await sendPasswordResetEmail(auth, email);
+        setError('Password reset link sent! Check your email inbox.');
+      } catch (err: any) {
+        setError(err.message || 'Failed to send reset link.');
+      }
+    } else {
+      setError('Firebase is not configured. Cannot send reset link in demo mode.');
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center py-12 px-4 relative overflow-hidden">
       <div className="minimal-grid-bg" />
@@ -151,6 +173,17 @@ export default function LoginPage() {
               tabIndex={-1}
             >
               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={handleResetPassword}
+              disabled={loading}
+              className="text-xs text-[#D4AF37] hover:text-[#f4d160] transition-colors focus:outline-none"
+            >
+              Forgot Password?
             </button>
           </div>
 

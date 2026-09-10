@@ -156,7 +156,7 @@ export default function AdminDashboardPage() {
               <span>Poll ID: <code className="text-white/70 bg-white/5 px-1.5 py-0.5 rounded">{activePoll?.id}</code></span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <button
               onClick={handleExportExcel}
               className="px-4 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg text-sm font-semibold hover:bg-[#D4AF37]/20 transition-colors flex items-center gap-2"
@@ -183,7 +183,10 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex flex-wrap border-b border-white/10 mb-8 justify-start">
+        <div className="flex border-b border-white/10 mb-8 overflow-x-auto" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          <style>{`
+            .flex.border-b.overflow-x-auto::-webkit-scrollbar { display: none; }
+          `}</style>
           {(['overview', 'votes', 'trends', 'feedbacks', 'products'] as const).map((tab) => (
             <button
               key={tab}
