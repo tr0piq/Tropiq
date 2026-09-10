@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { subscribeToVotes, subscribeToReviews, getProducts } from '../lib/data-service';
+import { subscribeToVotes, subscribeToReviews, getProducts, getAllVotes } from '../lib/data-service';
 import type { Poll, Vote, Product } from '../lib/data-service';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
-import { LogOut, RefreshCw, AlertCircle, ExternalLink, Activity, Users, Filter } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
+import { LogOut, ExternalLink, Download, FileSpreadsheet } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useNavigate, Link } from 'react-router-dom';
@@ -29,7 +29,7 @@ export default function AdminDashboardPage() {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'feedbacks' | 'products'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'votes' | 'trends' | 'feedbacks' | 'products'>('overview');
   const [products] = useState<Product[]>(getProducts);
   const [reviews, setReviews] = useState<any[]>([]);
 
@@ -51,6 +51,43 @@ export default function AdminDashboardPage() {
     if (auth) await signOut(auth);
     sessionStorage.removeItem('tropiq-admin');
     navigate('/login');
+  };
+
+  const handleExportExcel = async () => {
+    const xlsx = await import('xlsx');
+    const allVotes = await getAllVotes();
+    const activePoll = polls[0];
+
+    // Sheet 1: Vote Summary
+    const summary = activePoll?.options.map(opt => ({
+      Product: optionLabels[opt.id] || opt.label,
+      Votes: opt.voteCount,
+      Percentage: totalVotes > 0 ? ((opt.voteCount / totalVotes) * 100).toFixed(1) + '%' : '0%',
+    })) || [];
+
+    // Sheet 2: All raw votes
+    const rawVotes = allVotes.map((v, i) => ({
+      '#': i + 1,
+      'Option Voted': optionLabels[v.optionId] || v.optionId,
+      'Timestamp': new Date(v.timestamp).toLocaleString(),
+      'Voter Hash': v.voterHash,
+    }));
+
+    // Sheet 3: Reviews
+    const reviewsSheet = reviews.map((r: any, i: number) => ({
+      '#': i + 1,
+      Name: r.name,
+      Rating: r.rating,
+      Review: r.text,
+      'Voted For': r.votedFor,
+      Date: new Date(r.timestamp).toLocaleString(),
+    }));
+
+    const wb = xlsx.utils.book_new();
+    xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(summary), 'Vote Summary');
+    xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(rawVotes), 'All Votes');
+    xlsx.utils.book_append_sheet(wb, xlsx.utils.json_to_sheet(reviewsSheet), 'Reviews');
+    xlsx.writeFile(wb, `tropiq-analytics-${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const activePoll = polls[0];
@@ -102,7 +139,13 @@ export default function AdminDashboardPage() {
               <span>Poll ID: <code className="text-white/70 bg-white/5 px-1.5 py-0.5 rounded">{activePoll?.id}</code></span>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExportExcel}
+              className="px-4 py-2 bg-[#D4AF37]/10 border border-[#D4AF37]/30 text-[#D4AF37] rounded-lg text-sm font-semibold hover:bg-[#D4AF37]/20 transition-colors flex items-center gap-2"
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Export Excel
+            </button>
             <Link to="/" className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-semibold hover:bg-white/10 transition-colors flex items-center gap-2">
               <ExternalLink className="w-4 h-4" /> Live Site
             </Link>
@@ -124,7 +167,7 @@ export default function AdminDashboardPage() {
 
         {/* Tabs */}
         <div className="flex border-b border-white/10 mb-8 overflow-x-auto">
-          {(['overview', 'trends', 'feedbacks', 'products'] as const).map((tab) => (
+          {(['overview', 'votes', 'trends', 'feedbacks', 'products'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -180,6 +223,88 @@ export default function AdminDashboardPage() {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'votes' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-bold">Vote Breakdown</h3>
+              <span className="text-sm text-text-muted">{totalVotes} total votes</span>
+            </div>
+
+            {/* Per-product cards */}
+            {activePoll?.options
+              .slice()
+              .sort((a, b) => b.voteCount - a.voteCount)
+              .map((opt, rank) => {
+                const pct = totalVotes > 0 ? (opt.voteCount / totalVotes) * 100 : 0;
+                const color = optionColors[opt.id] || '#ffffff';
+                const label = optionLabels[opt.id] || opt.label;
+                const medals = ['🥇', '🥈', '🥉'];
+                return (
+                  <div key={opt.id} className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{medals[rank] || '🏅'}</span>
+                        <div>
+                          <p className="font-bold text-white text-lg">{label}</p>
+                          {opt.badge && (
+                            <span className="text-[10px] font-bold bg-[#D4AF37] text-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                              {opt.badge}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-3xl font-display font-bold text-white">{opt.voteCount.toLocaleString()}</p>
+                        <p className="text-sm text-text-muted">votes</p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="h-3 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{ width: `${pct}%`, backgroundColor: color }}
+                      />
+                    </div>
+                    <div className="flex justify-between mt-2 text-xs text-text-muted">
+                      <span>{pct.toFixed(1)}% of total votes</span>
+                      <span style={{ color }}>{rank === 0 ? '👑 Leading' : `+${(activePoll.options[0].voteCount - opt.voteCount)} behind leader`}</span>
+                    </div>
+                  </div>
+                );
+              })}
+
+            {/* Summary table */}
+            <div className="bg-[#0A0A0A] border border-white/5 rounded-2xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/5">
+                    <th className="text-left px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest">Product</th>
+                    <th className="text-right px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest">Votes</th>
+                    <th className="text-right px-6 py-4 text-xs font-bold text-text-muted uppercase tracking-widest">Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activePoll?.options.slice().sort((a, b) => b.voteCount - a.voteCount).map(opt => (
+                    <tr key={opt.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
+                      <td className="px-6 py-4 font-medium text-white">{optionLabels[opt.id] || opt.label}</td>
+                      <td className="px-6 py-4 text-right font-bold text-white">{opt.voteCount.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right text-[#D4AF37] font-bold">
+                        {totalVotes > 0 ? ((opt.voteCount / totalVotes) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-white/[0.02]">
+                    <td className="px-6 py-4 font-bold text-white">Total</td>
+                    <td className="px-6 py-4 text-right font-bold text-white">{totalVotes.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-right font-bold text-[#D4AF37]">100%</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -278,15 +403,15 @@ export default function AdminDashboardPage() {
               }} className="space-y-5">
                 <div>
                   <label className="text-xs font-bold text-white/60 uppercase block mb-2">Product Name *</label>
-                  <input type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" required />
+                  <input type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} maxLength={60} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" required />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-white/60 uppercase block mb-2">Description</label>
-                  <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" rows={3} />
+                  <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} maxLength={200} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" rows={3} />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-white/60 uppercase block mb-2">Badge Text (Optional)</label>
-                  <input type="text" placeholder="e.g. Mostly Liked" value={newProduct.badge} onChange={e => setNewProduct({...newProduct, badge: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" />
+                  <input type="text" placeholder="e.g. Mostly Liked" value={newProduct.badge} onChange={e => setNewProduct({...newProduct, badge: e.target.value})} maxLength={25} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-white/60 uppercase block mb-2">Product Image *</label>

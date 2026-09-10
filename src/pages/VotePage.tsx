@@ -8,6 +8,7 @@ import ProductCard from '../components/ProductCard';
 import { CheckCircle2, ArrowLeft, BarChart2 } from 'lucide-react';
 import { useIsAdmin } from '../hooks/useAuth';
 import ReviewForm from '../components/ReviewForm';
+import AdPopup from '../components/AdPopup';
 
 export default function VotePage() {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ export default function VotePage() {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [hasVoted, setHasVoted] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [showAd, setShowAd] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -45,7 +47,8 @@ export default function VotePage() {
       await castVote(poll.id, selectedOption);
       localStorage.setItem(`tropiq-voted-poll-${poll.id}`, selectedOption);
       setHasVoted(true);
-      setShowReview(true); // show the review form right after voting
+      setShowReview(true);
+      setShowAd(true); // show ad popup after voting
     } catch (e) {
       console.error(e);
     }
@@ -153,6 +156,7 @@ export default function VotePage() {
         )}
 
       </div>
+      <AdPopup show={showAd} onClose={() => setShowAd(false)} />
     </div>
   );
 }
