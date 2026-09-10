@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import { subscribeToReviews } from '../lib/data-service';
 import type { Review } from '../lib/data-service';
@@ -21,18 +21,17 @@ function ReviewCard({ review }: { review: Review }) {
     <div className="flex-shrink-0 w-72 border border-white/[0.06] bg-white/[0.02] rounded-2xl p-5 mx-3">
       <StarRow rating={review.rating} />
       <p className="text-sm text-white/80 mt-3 leading-relaxed line-clamp-3">"{review.text}"</p>
-      <div className="mt-4 flex items-center justify-between">
-        <span className="text-xs font-bold text-white">{review.name}</span>
-        <span className="text-[10px] text-[#6B7280] bg-white/5 px-2 py-0.5 rounded-full">{review.votedFor}</span>
+      <div className="mt-4 flex items-center justify-between gap-2">
+        <span className="text-xs font-bold text-white truncate">{review.name}</span>
+        <span className="text-[10px] text-[#6B7280] bg-white/5 px-2 py-0.5 rounded-full shrink-0">{review.votedFor}</span>
       </div>
     </div>
   );
 }
 
 function MarqueeRow({ reviews, direction }: { reviews: Review[]; direction: 'left' | 'right' }) {
-  // Duplicate for seamless loop
+  // Triplicate for a seamless infinite loop
   const items = [...reviews, ...reviews, ...reviews];
-
   return (
     <div className="overflow-hidden w-full">
       <div
@@ -47,16 +46,6 @@ function MarqueeRow({ reviews, direction }: { reviews: Review[]; direction: 'lef
   );
 }
 
-// Placeholder reviews shown before real ones load
-const PLACEHOLDERS: Review[] = [
-  { id: 'p1', name: 'Ayaan R.', rating: 5, text: 'Absolutely love the Pistachio Milk. Smooth, nutty, and refreshing!', votedFor: 'Pistachio Milk', timestamp: '' },
-  { id: 'p2', name: 'Meera S.', rating: 5, text: 'Cold Boost is literally my morning ritual now. Incredible taste.', votedFor: 'Cold Boost', timestamp: '' },
-  { id: 'p3', name: 'Zaid K.', rating: 4, text: 'Cold Coffee hits different. Best I\'ve had from a brand like this.', votedFor: 'Cold Coffee', timestamp: '' },
-  { id: 'p4', name: 'Priya T.', rating: 5, text: 'The pistachio milk surprised me — I was not expecting it to be THIS good.', votedFor: 'Pistachio Milk', timestamp: '' },
-  { id: 'p5', name: 'Farhan A.', rating: 5, text: 'Cold Boost before gym = 🔥. 10/10 would recommend.', votedFor: 'Cold Boost', timestamp: '' },
-  { id: 'p6', name: 'Layla H.', rating: 4, text: 'Great product, the Cold Coffee is perfectly balanced — not too sweet.', votedFor: 'Cold Coffee', timestamp: '' },
-];
-
 export default function ReviewsMarquee() {
   const [reviews, setReviews] = useState<Review[]>([]);
 
@@ -65,13 +54,12 @@ export default function ReviewsMarquee() {
     return () => unsub();
   }, []);
 
-  const displayReviews = reviews.length >= 4 ? reviews : [...reviews, ...PLACEHOLDERS].slice(0, Math.max(6, reviews.length));
+  // Need at least 2 reviews to make a marquee worthwhile
+  if (reviews.length < 2) return null;
 
-  if (displayReviews.length < 2) return null;
-
-  const half = Math.ceil(displayReviews.length / 2);
-  const row1 = displayReviews.slice(0, half);
-  const row2 = displayReviews.slice(half);
+  const half = Math.ceil(reviews.length / 2);
+  const row1 = reviews.slice(0, half);
+  const row2 = reviews.slice(half);
 
   return (
     <section className="py-24 overflow-hidden">
@@ -84,9 +72,15 @@ export default function ReviewsMarquee() {
         </h2>
       </div>
 
-      <div className="space-y-4">
-        <MarqueeRow reviews={row1} direction="left" />
-        {row2.length > 0 && <MarqueeRow reviews={row2} direction="right" />}
+      {/* Fade masks on left and right to prevent hard clipping */}
+      <div className="relative">
+        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-gradient-to-r from-[#040504] to-transparent" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-gradient-to-l from-[#040504] to-transparent" />
+
+        <div className="space-y-4">
+          <MarqueeRow reviews={row1} direction="left" />
+          {row2.length > 0 && <MarqueeRow reviews={row2} direction="right" />}
+        </div>
       </div>
     </section>
   );
