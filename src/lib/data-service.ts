@@ -1,5 +1,5 @@
 import { db, auth } from './firebase';
-import { collection, addDoc, onSnapshot, query, getDocs, Timestamp, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, getDocs, Timestamp, deleteDoc, doc, where } from 'firebase/firestore';
 
 export interface Product {
   id: string;
@@ -171,6 +171,20 @@ export async function castVote(pollId: string, optionId: string) {
     voterHash
   });
   // Vote saved to Firestore — no additional sync needed
+}
+
+export async function checkUserVoted(pollId: string, voterHash: string): Promise<string | null> {
+  if (!db) return null;
+  const q = query(
+    collection(db, 'votes'),
+    where('pollId', '==', pollId),
+    where('voterHash', '==', voterHash)
+  );
+  const snapshot = await getDocs(q);
+  if (!snapshot.empty) {
+    return snapshot.docs[0].data().optionId as string;
+  }
+  return null;
 }
 
 // Admin Chart Data Fetching

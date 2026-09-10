@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { subscribeToVotes, castVote, INITIAL_POLL } from '../lib/data-service';
+import { subscribeToVotes, castVote, checkUserVoted, INITIAL_POLL } from '../lib/data-service';
 import { isFirebaseConfigured, auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { Poll } from '../lib/data-service';
@@ -23,19 +23,38 @@ export default function VotePage() {
   useEffect(() => {
     let unsubscribeAuth = () => {};
 
+    const verifyVoteStatus = async (uid: string) => {
+      // 1. Check server first
+      const serverVotedOption = await checkUserVoted(INITIAL_POLL.id, uid);
+      if (serverVotedOption) {
+        setHasVoted(true);
+        setSelectedOption(serverVotedOption);
+        return;
+      }
+      
+      // 2. Fallback to local storage
+      const localVoted = localStorage.getItem(`tropiq-voted-poll-${INITIAL_POLL.id}-${uid}`);
+      if (localVoted) {
+        setHasVoted(true);
+        setSelectedOption(localVoted);
+      } else {
+        setHasVoted(false);
+        setSelectedOption(null);
+      }
+    };
+
     if (isFirebaseConfigured() && auth) {
       unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (!user) navigate('/login');
+        else verifyVoteStatus(user.uid);
       });
     } else {
       const isLoggedIn = sessionStorage.getItem('tropiq-user');
       if (!isLoggedIn) { navigate('/login'); return; }
+      else verifyVoteStatus(isLoggedIn);
     }
 
     const unsubscribeVotes = subscribeToVotes((livePoll) => setPoll(livePoll));
-
-    const voted = localStorage.getItem(`tropiq-voted-poll-${INITIAL_POLL.id}`);
-    if (voted) { setHasVoted(true); setSelectedOption(voted); }
 
     return () => { unsubscribeAuth(); unsubscribeVotes(); };
   }, [navigate]);
@@ -45,7 +64,8 @@ export default function VotePage() {
     setLoading(true);
     try {
       await castVote(poll.id, selectedOption);
-      localStorage.setItem(`tropiq-voted-poll-${poll.id}`, selectedOption);
+      const uid = auth?.currentUser?.uid || sessionStorage.getItem('tropiq-user') || 'demo';
+      localStorage.setItem(`tropiq-voted-poll-${poll.id}-${uid}`, selectedOption);
       setHasVoted(true);
       setShowReview(true);
       setShowAd(true); // show ad popup after voting
