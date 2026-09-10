@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { subscribeToVotes, getProducts } from '../lib/data-service';
+import { subscribeToVotes, subscribeToReviews, getProducts } from '../lib/data-service';
 import type { Poll, Vote, Product } from '../lib/data-service';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { LogOut, RefreshCw, AlertCircle, ExternalLink, Activity, Users, Filter } from 'lucide-react';
-import { auth, storage } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigate, Link } from 'react-router-dom';
 
 const optionColors: Record<string, string> = {
@@ -43,8 +42,7 @@ export default function AdminDashboardPage() {
     const unsubscribe = subscribeToVotes((livePoll) => {
       setPolls([livePoll]);
     });
-    const { subscribeToReviews } = require('../lib/data-service');
-    const unsubReviews = subscribeToReviews((data: any) => setReviews(data));
+    const unsubReviews = subscribeToReviews((data) => setReviews(data));
     setLoading(false);
     return () => { unsubscribe(); unsubReviews(); };
   }, []);
@@ -234,9 +232,30 @@ export default function AdminDashboardPage() {
                 if (!newProduct.name || !imageFile) return alert("Name and Image are required");
                 setIsUploading(true);
                 try {
-                  const fileRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
-                  await uploadBytes(fileRef, imageFile);
-                  const imageUrl = await getDownloadURL(fileRef);
+                  let imageUrl = '';
+                  
+                  // Use ImgBB for image hosting
+                  const apiKey = import.meta.env.VITE_IMGBB_API_KEY;
+                  if (!apiKey) {
+                    alert("Please add VITE_IMGBB_API_KEY to your .env.local file to use image uploading.");
+                    setIsUploading(false);
+                    return;
+                  }
+
+                  const formData = new FormData();
+                  formData.append('image', imageFile);
+
+                  const res = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+                    method: 'POST',
+                    body: formData
+                  });
+                  
+                  const imgbbData = await res.json();
+                  if (imgbbData.success) {
+                    imageUrl = imgbbData.data.url;
+                  } else {
+                    throw new Error("ImgBB upload failed");
+                  }
                   
                   const { addProduct } = await import('../lib/data-service');
                   await addProduct({
