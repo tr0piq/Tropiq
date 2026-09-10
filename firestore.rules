@@ -1,0 +1,15 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Votes collection: anyone can read, only authenticated users can write
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+    }
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
