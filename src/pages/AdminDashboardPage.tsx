@@ -183,12 +183,12 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/10 mb-8 overflow-x-auto">
+        <div className="flex flex-wrap border-b border-white/10 mb-8 justify-start">
           {(['overview', 'votes', 'trends', 'feedbacks', 'products'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-sm font-semibold capitalize transition-all duration-200 relative whitespace-nowrap ${
+              className={`flex-auto sm:flex-none text-center px-3 sm:px-6 py-3 text-xs sm:text-sm font-semibold capitalize transition-all duration-200 relative whitespace-nowrap ${
                 activeTab === tab ? 'text-white' : 'text-text-muted hover:text-white/80'
               }`}
             >
