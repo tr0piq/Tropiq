@@ -30,16 +30,33 @@ export default function LoginPage() {
 
     if (isFirebaseConfigured() && auth) {
       try {
-        const { signInWithEmailAndPassword } = await import('firebase/auth');
-        await signInWithEmailAndPassword(auth, email, password);
-        navigate('/vote');
-      } catch (signInErr: any) {
-        const code = signInErr.code;
-        if (code === 'auth/user-not-found' || code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
-          setError('Invalid email or password.');
-        } else {
-          setError(signInErr.message || 'Authentication error');
+        const { signInWithEmailAndPassword, createUserWithEmailAndPassword } = await import('firebase/auth');
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+          navigate('/vote');
+        } catch (signInErr: any) {
+          if (signInErr.code === 'auth/user-not-found' || signInErr.code === 'auth/invalid-credential') {
+            // User might not exist, try creating the account
+            try {
+              await createUserWithEmailAndPassword(auth, email, password);
+              navigate('/vote');
+            } catch (createErr: any) {
+              if (createErr.code === 'auth/email-already-in-use') {
+                setError('Invalid email or password.'); // Account exists but wrong password was given
+              } else if (createErr.code === 'auth/weak-password') {
+                setError('Password should be at least 6 characters.');
+              } else {
+                setError(createErr.message || 'Authentication error');
+              }
+            }
+          } else if (signInErr.code === 'auth/wrong-password') {
+            setError('Invalid email or password.');
+          } else {
+            setError(signInErr.message || 'Authentication error');
+          }
         }
+      } catch (err: any) {
+        setError(err.message || 'Authentication error');
       }
     } else {
       // Demo Mode
@@ -170,7 +187,7 @@ export default function LoginPage() {
             className="w-full mt-4 h-12 bg-white/10 text-white font-semibold rounded-full hover:bg-white/20 border border-white/10 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Mail className="w-4 h-4" />
-            {loading ? 'Signing in...' : 'Sign in with Email'}
+            {loading ? 'Processing...' : 'Continue with Email'}
           </button>
         </form>
       </div>
