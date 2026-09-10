@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogIn, LogOut, BarChart2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { auth } from '../lib/firebase';
@@ -12,23 +12,26 @@ const navLinks = [
 
 export default function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const user = useCurrentUser();
   const isAdmin = useIsAdmin();
   const [scrolled, setScrolled] = useState(false);
 
-  const isAdminPage = location.pathname.startsWith('/admin');
-  if (isAdminPage) return null;
-
+  // Must come before any early returns to comply with React hooks rules
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Hide navbar on admin pages
+  const isAdminPage = location.pathname.startsWith('/admin');
+  if (isAdminPage) return null;
+
   const handleSignOut = async () => {
     if (auth) await signOut(auth);
     sessionStorage.removeItem('tropiq-user');
-    window.location.reload();
+    navigate('/login');
   };
 
   return (
@@ -75,6 +78,7 @@ export default function Navbar() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          {/* Admin Dashboard icon — only shown to admin */}
           {isAdmin && (
             <Link
               to="/admin/dashboard"

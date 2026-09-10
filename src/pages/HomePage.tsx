@@ -5,9 +5,11 @@ import { BarChart2, ArrowRight } from 'lucide-react';
 import { getProducts, subscribeToProducts } from '../lib/data-service';
 import type { Product } from '../lib/data-service';
 import ReviewsMarquee from '../components/ReviewsMarquee';
+import { useIsAdmin } from '../hooks/useAuth';
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
   const [products, setProducts] = useState<Product[]>(getProducts());
 
   useEffect(() => {
@@ -96,12 +98,15 @@ export default function HomePage() {
             <span className="text-xs text-text-muted uppercase tracking-widest font-semibold">Live Data Processing</span>
           </div>
           <h3 className="text-2xl font-display font-medium text-white mb-6">Track the global consensus in real-time.</h3>
-          <Link 
-            to="/admin/dashboard" 
-            className="inline-flex items-center gap-2 text-sm font-bold text-text-secondary hover:text-white transition-colors uppercase tracking-widest group"
-          >
-            Access Analytics <BarChart2 className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
+          {/* Only show dashboard link to admin users */}
+          {isAdmin && (
+            <Link 
+              to="/admin/dashboard" 
+              className="inline-flex items-center gap-2 text-sm font-bold text-text-secondary hover:text-white transition-colors uppercase tracking-widest group"
+            >
+              Access Analytics <BarChart2 className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+          )}
         </motion.div>
 
         {/* Reviews Marquee */}

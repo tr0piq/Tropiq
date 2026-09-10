@@ -32,7 +32,7 @@ export default function VotePage() {
 
     const unsubscribeVotes = subscribeToVotes((livePoll) => setPoll(livePoll));
 
-    const voted = localStorage.getItem('tropiq-voted-poll-tropiq-fav');
+    const voted = localStorage.getItem(`tropiq-voted-poll-${INITIAL_POLL.id}`);
     if (voted) { setHasVoted(true); setSelectedOption(voted); }
 
     return () => { unsubscribeAuth(); unsubscribeVotes(); };
