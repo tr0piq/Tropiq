@@ -7,7 +7,11 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.auth != null;
     }
-    // Deny everything else
+    // Reviews collection: anyone can read, only authenticated users can write
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+    }
     match /{document=**} {
       allow read, write: if false;
     }

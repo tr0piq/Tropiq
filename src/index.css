@@ -61,3 +61,21 @@ body {
   from { opacity: 0; transform: translateY(30px); filter: blur(10px); }
   to { opacity: 1; transform: translateY(0); filter: blur(0px); }
 }
+
+@keyframes marqueeLeft {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-33.33%); }
+}
+
+@keyframes marqueeRight {
+  0% { transform: translateX(-33.33%); }
+  100% { transform: translateX(0); }
+}
+
+.animate-marquee-left {
+  animation: marqueeLeft 30s linear infinite;
+}
+
+.animate-marquee-right {
+  animation: marqueeRight 30s linear infinite;
+}

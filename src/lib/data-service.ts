@@ -1,5 +1,5 @@
 import { db, auth } from './firebase';
-import { collection, addDoc, onSnapshot, query, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, getDocs, Timestamp, deleteDoc, doc } from 'firebase/firestore';
 
 export interface Product {
   id: string;
@@ -8,6 +8,7 @@ export interface Product {
   imageUrl: string;
   category: string;
   tags: string[];
+  badge?: string; // e.g. "Mostly Liked"
 }
 
 export interface PollOption {
@@ -16,6 +17,7 @@ export interface PollOption {
   label: string;
   imageUrl: string;
   voteCount: number;
+  badge?: string;
 }
 
 export interface Poll {
@@ -85,14 +87,35 @@ export function getProducts() {
 
 // Keep a local cache of vote counts to supply synchronously if needed before snapshot resolves
 let liveVoteCounts: Record<string, number> = {};
+let dynamicProducts: Product[] = [];
 
-// Subscribe to live votes
+// Subscribe to dynamic products
+export function subscribeToProducts(callback: (products: Product[]) => void) {
+  if (!db) return () => {};
+  const q = query(collection(db, 'products'));
+  return onSnapshot(q, (snapshot) => {
+    const products: Product[] = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Product));
+    dynamicProducts = products;
+    callback([...PRODUCTS, ...products]);
+  });
+}
+
+// Add a new product
+export async function addProduct(product: Omit<Product, 'id'>) {
+  if (!db) throw new Error("Firestore not initialized");
+  await addDoc(collection(db, 'products'), product);
+}
+
+// Subscribe to live votes and merge with products
 export function subscribeToVotes(callback: (poll: Poll) => void) {
   if (!db) return () => {};
 
   const q = query(collection(db, 'votes'));
   
-  const unsubscribe = onSnapshot(q, (snapshot) => {
+  const unsubscribeVotes = onSnapshot(q, (snapshot) => {
     const counts: Record<string, number> = {};
     snapshot.forEach((doc) => {
       const data = doc.data();
@@ -100,19 +123,38 @@ export function subscribeToVotes(callback: (poll: Poll) => void) {
     });
     
     liveVoteCounts = counts;
-
-    const updatedPoll = {
-      ...INITIAL_POLL,
-      options: INITIAL_POLL.options.map(opt => ({
-        ...opt,
-        voteCount: counts[opt.id] || 0
-      }))
-    };
-    
-    callback(updatedPoll);
+    updateCombinedPoll(counts, callback);
   });
 
-  return unsubscribe;
+  const unsubscribeProducts = subscribeToProducts(() => {
+    updateCombinedPoll(liveVoteCounts, callback);
+  });
+
+  return () => {
+    unsubscribeVotes();
+    unsubscribeProducts();
+  };
+}
+
+function updateCombinedPoll(counts: Record<string, number>, callback: (poll: Poll) => void) {
+  const allProducts = [...PRODUCTS, ...dynamicProducts];
+  
+  // Build dynamic options based on all products
+  const dynamicOptions: PollOption[] = allProducts.map(p => ({
+    id: `opt-${p.id}`,
+    productId: p.id,
+    label: p.name,
+    imageUrl: p.imageUrl,
+    voteCount: counts[`opt-${p.id}`] || 0,
+    badge: p.badge
+  }));
+
+  const updatedPoll = {
+    ...INITIAL_POLL,
+    options: dynamicOptions
+  };
+  
+  callback(updatedPoll);
 }
 
 export async function castVote(pollId: string, optionId: string) {
@@ -188,4 +230,51 @@ export async function getHourlyDistribution() {
   });
 
   return Object.entries(byHour).map(([hour, count]) => ({ name: hour, votes: count }));
+}
+
+// ─── Reviews ───
+export interface Review {
+  id?: string;
+  name: string;
+  rating: number; // 1-5
+  text: string;
+  votedFor: string; // product label
+  timestamp: string;
+  uid?: string;
+}
+
+export async function submitReview(review: Omit<Review, 'id' | 'timestamp'>): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  await addDoc(collection(db, 'reviews'), {
+    ...review,
+    timestamp: Timestamp.now(),
+    uid: auth?.currentUser?.uid || 'anonymous',
+  });
+}
+
+export function subscribeToReviews(callback: (reviews: Review[]) => void) {
+  if (!db) { callback([]); return () => {}; }
+  const q = query(collection(db, 'reviews'));
+  return onSnapshot(q, (snapshot) => {
+    const reviews: Review[] = snapshot.docs.map(doc => {
+      const d = doc.data();
+      return {
+        id: doc.id,
+        name: d.name,
+        rating: d.rating,
+        text: d.text,
+        votedFor: d.votedFor,
+        timestamp: d.timestamp?.toDate?.()?.toISOString() || new Date().toISOString(),
+        uid: d.uid,
+      };
+    });
+    // Newest first
+    reviews.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    callback(reviews);
+  });
+}
+
+export async function deleteReview(id: string): Promise<void> {
+  if (!db) throw new Error('Firestore not initialized');
+  await deleteDoc(doc(db, 'reviews', id));
 }

@@ -3,8 +3,9 @@ import { subscribeToVotes, getProducts } from '../lib/data-service';
 import type { Poll, Vote, Product } from '../lib/data-service';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, AreaChart, Area } from 'recharts';
 import { LogOut, RefreshCw, AlertCircle, ExternalLink, Activity, Users, Filter } from 'lucide-react';
-import { auth } from '../lib/firebase';
+import { auth, storage } from '../lib/firebase';
 import { signOut } from 'firebase/auth';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigate, Link } from 'react-router-dom';
 
 const optionColors: Record<string, string> = {
@@ -29,15 +30,23 @@ export default function AdminDashboardPage() {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'votes'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'trends' | 'feedbacks' | 'products'>('overview');
   const [products] = useState<Product[]>(getProducts);
+  const [reviews, setReviews] = useState<any[]>([]);
+
+  // Add Product Form State
+  const [newProduct, setNewProduct] = useState({ name: '', description: '', badge: '' });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToVotes((livePoll) => {
       setPolls([livePoll]);
     });
+    const { subscribeToReviews } = require('../lib/data-service');
+    const unsubReviews = subscribeToReviews((data: any) => setReviews(data));
     setLoading(false);
-    return () => unsubscribe();
+    return () => { unsubscribe(); unsubReviews(); };
   }, []);
 
   const handleLogout = async () => {
@@ -116,12 +125,12 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-white/10 mb-8">
-          {(['overview', 'trends'] as const).map((tab) => (
+        <div className="flex border-b border-white/10 mb-8 overflow-x-auto">
+          {(['overview', 'trends', 'feedbacks', 'products'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 text-sm font-semibold capitalize transition-all duration-200 relative ${
+              className={`px-6 py-3 text-sm font-semibold capitalize transition-all duration-200 relative whitespace-nowrap ${
                 activeTab === tab ? 'text-white' : 'text-text-muted hover:text-white/80'
               }`}
             >
@@ -180,6 +189,113 @@ export default function AdminDashboardPage() {
         {activeTab === 'trends' && (
           <div className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-6 flex items-center justify-center h-64 text-text-muted">
             Trend comparison analysis will appear here once more historical data is collected.
+          </div>
+        )}
+
+        {activeTab === 'feedbacks' && (
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold mb-6">Feedback Moderation</h3>
+            {reviews.length === 0 ? (
+              <p className="text-text-muted">No feedback received yet.</p>
+            ) : (
+              reviews.map(review => (
+                <div key={review.id} className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-6 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="font-bold text-white">{review.name}</span>
+                      <span className="text-[#D4AF37] text-sm">{'★'.repeat(review.rating)}</span>
+                      <span className="text-xs text-text-muted bg-white/5 px-2 py-0.5 rounded-full">{review.votedFor}</span>
+                    </div>
+                    <p className="text-text-secondary text-sm">"{review.text}"</p>
+                    <p className="text-xs text-text-muted mt-3">{new Date(review.timestamp).toLocaleString()}</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Are you sure you want to delete this feedback?')) return;
+                      const { deleteReview } = await import('../lib/data-service');
+                      await deleteReview(review.id);
+                    }}
+                    className="px-4 py-2 bg-red-500/10 text-red-400 text-xs font-bold uppercase rounded-lg hover:bg-red-500/20 transition-colors shrink-0"
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'products' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-8">
+              <h3 className="text-xl font-bold mb-6">Add New Product</h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newProduct.name || !imageFile) return alert("Name and Image are required");
+                setIsUploading(true);
+                try {
+                  const fileRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+                  await uploadBytes(fileRef, imageFile);
+                  const imageUrl = await getDownloadURL(fileRef);
+                  
+                  const { addProduct } = await import('../lib/data-service');
+                  await addProduct({
+                    name: newProduct.name,
+                    description: newProduct.description,
+                    badge: newProduct.badge,
+                    imageUrl,
+                    category: 'Dynamic',
+                    tags: []
+                  });
+                  
+                  setNewProduct({ name: '', description: '', badge: '' });
+                  setImageFile(null);
+                  alert("Product added successfully!");
+                } catch (err) {
+                  console.error(err);
+                  alert("Failed to upload product.");
+                }
+                setIsUploading(false);
+              }} className="space-y-5">
+                <div>
+                  <label className="text-xs font-bold text-white/60 uppercase block mb-2">Product Name *</label>
+                  <input type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" required />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-white/60 uppercase block mb-2">Description</label>
+                  <textarea value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" rows={3} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-white/60 uppercase block mb-2">Badge Text (Optional)</label>
+                  <input type="text" placeholder="e.g. Mostly Liked" value={newProduct.badge} onChange={e => setNewProduct({...newProduct, badge: e.target.value})} className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-white/60 uppercase block mb-2">Product Image *</label>
+                  <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files?.[0] || null)} className="w-full text-sm text-white/60 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-[#D4AF37] file:text-black hover:file:bg-white transition-colors" required />
+                </div>
+                <button type="submit" disabled={isUploading} className="w-full py-3 bg-white text-black font-bold uppercase tracking-widest text-sm rounded-lg hover:bg-[#D4AF37] transition-colors disabled:opacity-50">
+                  {isUploading ? 'Uploading...' : 'Publish Product'}
+                </button>
+              </form>
+            </div>
+            
+            <div className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-8">
+              <h3 className="text-xl font-bold mb-6">Current Products</h3>
+              <div className="space-y-4">
+                {products.map(p => (
+                  <div key={p.id} className="flex items-center gap-4 bg-black border border-white/5 p-4 rounded-xl">
+                    <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded object-cover" />
+                    <div>
+                      <p className="font-bold text-white flex items-center gap-2">
+                        {p.name}
+                        {p.badge && <span className="bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">{p.badge}</span>}
+                      </p>
+                      <p className="text-xs text-text-muted truncate max-w-xs">{p.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 

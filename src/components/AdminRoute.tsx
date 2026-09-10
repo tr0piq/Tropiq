@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { isFirebaseConfigured, auth } from '../lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const ADMIN_UUIDS = [
-  'veY9xdNhpKWtCVAxFHpRCEvIVcb2',
-];
+const ADMIN_UUIDS = [import.meta.env.VITE_ADMIN_UID].filter(Boolean);
 
 export default function AdminRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -19,7 +17,7 @@ export default function AdminRoute({ children }: { children: React.ReactNode }) 
         if (user && ADMIN_UUIDS.includes(user.uid)) {
           setIsAuthorized(true);
         } else {
-          navigate('/admin/login', { replace: true });
+          navigate('/login', { replace: true });
         }
       });
     } else {

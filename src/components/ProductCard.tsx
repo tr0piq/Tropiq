@@ -22,6 +22,12 @@ export default function ProductCard({ option, selected, onSelect, disabled }: Pr
     >
       <div className="absolute inset-0 bg-gradient-to-t from-[#040504] via-[#040504]/50 to-transparent z-10 opacity-90" />
       
+      {option.badge && (
+        <div className="absolute top-4 left-4 z-30 px-3 py-1.5 bg-[#D4AF37]/90 text-black text-[10px] font-bold tracking-widest uppercase rounded-full shadow-lg backdrop-blur-sm">
+          {option.badge}
+        </div>
+      )}
+
       <img
         src={option.imageUrl}
         alt={option.label}

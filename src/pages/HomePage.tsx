@@ -2,19 +2,25 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BarChart2, ArrowRight } from 'lucide-react';
-import { getProducts } from '../lib/data-service';
+import { getProducts, subscribeToProducts } from '../lib/data-service';
 import type { Product } from '../lib/data-service';
+import ReviewsMarquee from '../components/ReviewsMarquee';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const [products] = useState<Product[]>(getProducts);
+  const [products, setProducts] = useState<Product[]>(getProducts());
+
+  useEffect(() => {
+    const unsub = subscribeToProducts((ps) => setProducts(ps));
+    return () => unsub();
+  }, []);
 
   const handleVoteClick = () => {
     navigate('/vote');
   };
 
   return (
-    <div className="min-h-screen bg-background relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <div className="min-h-screen bg-background relative pt-36 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div className="minimal-grid-bg fixed inset-0 pointer-events-none opacity-50" />
       
       {/* Cinematic Ambient Glows */}
@@ -97,6 +103,11 @@ export default function HomePage() {
             Access Analytics <BarChart2 className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </motion.div>
+
+        {/* Reviews Marquee */}
+        <div className="relative z-20 mt-12">
+          <ReviewsMarquee />
+        </div>
 
       </div>
     </div>
