@@ -33,7 +33,8 @@ export default function VotePage() {
       }
       
       // 2. Fallback to local storage
-      const localVoted = localStorage.getItem(`tropiq-voted-poll-${INITIAL_POLL.id}-${uid}`);
+      const dateKey = new Date().toDateString();
+      const localVoted = localStorage.getItem(`tropiq-voted-poll-${INITIAL_POLL.id}-${uid}-${dateKey}`);
       if (localVoted) {
         setHasVoted(true);
         setSelectedOption(localVoted);
@@ -65,7 +66,8 @@ export default function VotePage() {
     try {
       await castVote(poll.id, selectedOption);
       const uid = auth?.currentUser?.uid || sessionStorage.getItem('tropiq-user') || 'demo';
-      localStorage.setItem(`tropiq-voted-poll-${poll.id}-${uid}`, selectedOption);
+      const dateKey = new Date().toDateString();
+      localStorage.setItem(`tropiq-voted-poll-${poll.id}-${uid}-${dateKey}`, selectedOption);
       setHasVoted(true);
       setShowReview(true);
       setShowAd(true); // show ad popup after voting

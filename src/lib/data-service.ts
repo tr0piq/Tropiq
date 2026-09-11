@@ -181,8 +181,15 @@ export async function checkUserVoted(pollId: string, voterHash: string): Promise
     where('voterHash', '==', voterHash)
   );
   const snapshot = await getDocs(q);
-  if (!snapshot.empty) {
-    return snapshot.docs[0].data().optionId as string;
+  
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    if (data.timestamp && data.timestamp.toDate() >= startOfDay) {
+      return data.optionId as string;
+    }
   }
   return null;
 }

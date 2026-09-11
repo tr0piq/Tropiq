@@ -33,9 +33,9 @@ function MarqueeRow({ reviews, direction }: { reviews: Review[]; direction: 'lef
   // Triplicate for a seamless infinite loop
   const items = [...reviews, ...reviews, ...reviews];
   return (
-    <div className="overflow-hidden w-full">
+    <div className="overflow-x-auto w-full no-scrollbar">
       <div
-        className={`flex ${direction === 'left' ? 'animate-marquee-left' : 'animate-marquee-right'}`}
+        className={`flex hover:[animation-play-state:paused] ${direction === 'left' ? 'animate-marquee-left' : 'animate-marquee-right'}`}
         style={{ width: 'max-content' }}
       >
         {items.map((r, i) => (
@@ -72,11 +72,11 @@ export default function ReviewsMarquee() {
         </h2>
       </div>
 
-      {/* Fade masks on left and right to prevent hard clipping */}
-      <div className="relative">
-        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-gradient-to-r from-[#040504] to-transparent" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 pointer-events-none bg-gradient-to-l from-[#040504] to-transparent" />
-
+      {/* Feather effect (mask) */}
+      <div 
+        className="relative"
+        style={{ WebkitMaskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)', maskImage: 'linear-gradient(to right, transparent, black 10%, black 90%, transparent)' }}
+      >
         <div className="space-y-4">
           <MarqueeRow reviews={row1} direction="left" />
           {row2.length > 0 && <MarqueeRow reviews={row2} direction="right" />}

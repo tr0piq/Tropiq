@@ -24,6 +24,14 @@ body {
   overflow-x: hidden;
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 .text-gradient-white {
   background: linear-gradient(135deg, #ffffff 0%, #a0a0a0 100%);
   -webkit-background-clip: text;
