@@ -7,10 +7,15 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true;
     }
-    // Reviews collection: anyone can read, only authenticated users can write
+    // Products collection: anyone can read, authenticated users can write
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    // Reviews collection: anyone can read, only authenticated users can create or delete
     match /reviews/{reviewId} {
       allow read: if true;
-      allow create: if request.auth != null;
+      allow create, delete: if request.auth != null;
     }
     match /{document=**} {
       allow read, write: if false;

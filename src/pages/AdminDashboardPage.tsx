@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { subscribeToVotes, subscribeToReviews, getProducts, getAllVotes } from '../lib/data-service';
+import { subscribeToVotes, subscribeToReviews, getProducts, getAllVotes, subscribeToProducts } from '../lib/data-service';
 import type { Poll, Vote, Product } from '../lib/data-service';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { LogOut, ExternalLink, Download, FileSpreadsheet, Trophy, Medal, Award, Crown } from 'lucide-react';
@@ -30,7 +30,7 @@ export default function AdminDashboardPage() {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'votes' | 'trends' | 'feedbacks' | 'products'>('overview');
-  const [products] = useState<Product[]>(getProducts);
+  const [products, setProducts] = useState<Product[]>(getProducts);
   const [reviews, setReviews] = useState<any[]>([]);
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -49,8 +49,9 @@ export default function AdminDashboardPage() {
       setPolls([livePoll]);
     });
     const unsubReviews = subscribeToReviews((data) => setReviews(data));
+    const unsubProducts = subscribeToProducts((data) => setProducts(data));
     setLoading(false);
-    return () => { unsubscribe(); unsubReviews(); };
+    return () => { unsubscribe(); unsubReviews(); unsubProducts(); };
   }, []);
 
   const handleLogout = async () => {
