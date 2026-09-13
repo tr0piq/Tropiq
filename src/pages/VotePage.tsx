@@ -9,6 +9,7 @@ import { CheckCircle2, ArrowLeft, BarChart2 } from 'lucide-react';
 import { useIsAdmin } from '../hooks/useAuth';
 import ReviewForm from '../components/ReviewForm';
 import AdPopup from '../components/AdPopup';
+import confetti from 'canvas-confetti';
 
 export default function VotePage() {
   const navigate = useNavigate();
@@ -69,6 +70,33 @@ export default function VotePage() {
       const dateKey = new Date().toDateString();
       localStorage.setItem(`tropiq-voted-poll-${poll.id}-${uid}-${dateKey}`, selectedOption);
       setHasVoted(true);
+      
+      // Trigger premium confetti burst
+      const duration = 3000;
+      const end = Date.now() + duration;
+
+      const frame = () => {
+        confetti({
+          particleCount: 5,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: ['#D4AF37', '#ffffff']
+        });
+        confetti({
+          particleCount: 5,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: ['#D4AF37', '#ffffff']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      };
+      frame();
+
       setShowReview(true);
       setShowAd(true); // show ad popup after voting
     } catch (e) {

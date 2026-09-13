@@ -1,5 +1,5 @@
 import { db, auth } from './firebase';
-import { collection, addDoc, onSnapshot, query, getDocs, Timestamp, deleteDoc, doc, where } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, getDocs, Timestamp, deleteDoc, doc, where, setDoc, updateDoc } from 'firebase/firestore';
 
 export interface Product {
   id: string;
@@ -107,6 +107,36 @@ export function subscribeToProducts(callback: (products: Product[]) => void) {
 export async function addProduct(product: Omit<Product, 'id'>) {
   if (!db) throw new Error("Firestore not initialized");
   await addDoc(collection(db, 'products'), product);
+}
+
+// Update a product
+export async function updateProduct(id: string, productData: Partial<Product>) {
+  if (!db) throw new Error("Firestore not initialized");
+  await updateDoc(doc(db, 'products', id), productData);
+}
+
+// Delete a product
+export async function deleteProduct(id: string) {
+  if (!db) throw new Error("Firestore not initialized");
+  await deleteDoc(doc(db, 'products', id));
+}
+
+// ─── Product Availability ───
+export function subscribeToProductAvailability(callback: (availableIds: string[] | null) => void) {
+  if (!db) return () => {};
+  return onSnapshot(doc(db, 'settings', 'availability'), (snapshot) => {
+    if (snapshot.exists()) {
+      const data = snapshot.data();
+      callback(data.productIds as string[]);
+    } else {
+      callback(null); // Document doesn't exist, meaning all products are available
+    }
+  });
+}
+
+export async function updateProductAvailability(productIds: string[]) {
+  if (!db) throw new Error("Firestore not initialized");
+  await setDoc(doc(db, 'settings', 'availability'), { productIds });
 }
 
 // Subscribe to live votes and merge with products

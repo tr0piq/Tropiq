@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { subscribeToVotes, subscribeToReviews, getProducts, getAllVotes, subscribeToProducts } from '../lib/data-service';
-import type { Poll, Vote, Product } from '../lib/data-service';
+import { subscribeToVotes, subscribeToReviews, getProducts, getAllVotes, subscribeToProducts, getVotesByDay, subscribeToProductAvailability } from '../lib/data-service';
+import type { Poll, Vote, Product, DailyVoteData } from '../lib/data-service';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, AreaChart, Area } from 'recharts';
 import { LogOut, ExternalLink, Download, FileSpreadsheet, Trophy, Medal, Award, Crown } from 'lucide-react';
 import { auth } from '../lib/firebase';
@@ -19,10 +19,6 @@ const optionLabels: Record<string, string> = {
   'opt-coldcoffee': 'Cold Coffee',
 };
 
-interface DailyVoteData {
-  date: string;
-  votes: number;
-}
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
@@ -30,8 +26,14 @@ export default function AdminDashboardPage() {
   const [votes, setVotes] = useState<Vote[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'votes' | 'trends' | 'feedbacks' | 'products'>('overview');
-  const [products, setProducts] = useState<Product[]>(getProducts);
+  const [products, setProducts] = useState<Product[]>(getProducts());
   const [reviews, setReviews] = useState<any[]>([]);
+  const [dailyData, setDailyData] = useState<DailyVoteData[]>([]);
+  const [availableProductIds, setAvailableProductIds] = useState<string[] | null>(null);
+  const [reviewToDelete, setReviewToDelete] = useState<string | null>(null);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [editProductForm, setEditProductForm] = useState({ name: '', description: '', badge: '' });
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const showToast = (msg: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -50,8 +52,17 @@ export default function AdminDashboardPage() {
     });
     const unsubReviews = subscribeToReviews((data) => setReviews(data));
     const unsubProducts = subscribeToProducts((data) => setProducts(data));
-    setLoading(false);
-    return () => { unsubscribe(); unsubReviews(); unsubProducts(); };
+    const unsubAvailability = subscribeToProductAvailability((ids) => setAvailableProductIds(ids));
+    
+    getVotesByDay().then(data => {
+      setDailyData(data);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Failed to fetch daily data:', err);
+      setLoading(false);
+    });
+
+    return () => { unsubscribe(); unsubReviews(); unsubProducts(); unsubAvailability(); };
   }, []);
 
   const handleLogout = async () => {
@@ -112,16 +123,6 @@ export default function AdminDashboardPage() {
     (prev && prev.voteCount > current.voteCount) ? prev : current
   , activePoll?.options[0]);
 
-  // Derive daily mock data since we don't have raw timestamps in the aggregated Poll object 
-  // (In a real app, we'd query Firestore for raw votes)
-  const dailyData: DailyVoteData[] = [
-    { date: 'Mon', votes: Math.floor(totalVotes * 0.1) },
-    { date: 'Tue', votes: Math.floor(totalVotes * 0.15) },
-    { date: 'Wed', votes: Math.floor(totalVotes * 0.25) },
-    { date: 'Thu', votes: Math.floor(totalVotes * 0.2) },
-    { date: 'Fri', votes: Math.floor(totalVotes * 0.3) },
-  ];
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -180,7 +181,7 @@ export default function AdminDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <StatCard label="Total Votes" value={totalVotes.toLocaleString()} />
           <StatCard label="Current Leader" value={leader ? (optionLabels[leader.id] || leader.label) : '—'} highlight={optionColors[leader?.id || '']} />
-          <StatCard label="Today's Votes" value={dailyData[4].votes.toLocaleString()} />
+          <StatCard label="Today's Votes" value={dailyData.length > 0 ? dailyData[dailyData.length - 1].votes.toLocaleString() : '0'} />
         </div>
 
         {/* Tabs */}
@@ -366,11 +367,7 @@ export default function AdminDashboardPage() {
                     <p className="text-xs text-text-muted mt-3">{new Date(review.timestamp).toLocaleString()}</p>
                   </div>
                   <button
-                    onClick={async () => {
-                      if (!confirm('Are you sure you want to delete this feedback?')) return;
-                      const { deleteReview } = await import('../lib/data-service');
-                      await deleteReview(review.id);
-                    }}
+                    onClick={() => setReviewToDelete(review.id)}
                     className="px-4 py-2 bg-red-500/10 text-red-400 text-xs font-bold uppercase rounded-lg hover:bg-red-500/20 transition-colors shrink-0"
                   >
                     Delete
@@ -459,24 +456,224 @@ export default function AdminDashboardPage() {
             <div className="bg-[#0A0A0A] border border-white/5 rounded-2xl p-8">
               <h3 className="text-xl font-bold mb-6">Current Products</h3>
               <div className="space-y-4">
-                {products.map(p => (
-                  <div key={p.id} className="flex items-center gap-4 bg-black border border-white/5 p-4 rounded-xl">
-                    <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded object-cover" />
-                    <div>
-                      <p className="font-bold text-white flex items-center gap-2">
-                        {p.name}
-                        {p.badge && <span className="bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">{p.badge}</span>}
-                      </p>
-                      <p className="text-xs text-text-muted truncate max-w-xs">{p.description}</p>
+                {products.map(p => {
+                  const isAvailable = availableProductIds === null ? true : availableProductIds.includes(p.id);
+                  return (
+                    <div key={p.id} className="flex items-center gap-4 bg-black border border-white/5 p-4 rounded-xl">
+                      <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded object-cover" />
+                      <div className="flex-1">
+                        <p className="font-bold text-white flex items-center gap-2">
+                          {p.name}
+                          {p.badge && <span className="bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">{p.badge}</span>}
+                        </p>
+                        <p className="text-xs text-text-muted truncate max-w-xs">{p.description}</p>
+                      </div>
+                      <div className="flex items-center gap-3 border-l border-white/10 pl-4">
+                        <label className="text-xs font-bold text-text-muted uppercase cursor-pointer flex items-center gap-2">
+                          <input 
+                            type="checkbox" 
+                            checked={isAvailable}
+                            onChange={async (e) => {
+                              const checked = e.target.checked;
+                              let newIds: string[] = [];
+                              if (availableProductIds === null) {
+                                newIds = products.map(prod => prod.id);
+                              } else {
+                                newIds = [...availableProductIds];
+                              }
+                              
+                              if (checked) {
+                                if (!newIds.includes(p.id)) newIds.push(p.id);
+                              } else {
+                                newIds = newIds.filter(id => id !== p.id);
+                              }
+                              
+                              try {
+                                const { updateProductAvailability } = await import('../lib/data-service');
+                                await updateProductAvailability(newIds);
+                                showToast(`${p.name} is now ${checked ? 'available' : 'hidden'}.`, 'success');
+                              } catch (err) {
+                                console.error(err);
+                                showToast('Failed to update availability.', 'error');
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-white/20 bg-black text-[#D4AF37] focus:ring-[#D4AF37] focus:ring-offset-black" 
+                          />
+                          Available Today
+                        </label>
+                      </div>
+                      
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+                        <button
+                          onClick={() => {
+                            setProductToEdit(p);
+                            setEditProductForm({ name: p.name, description: p.description, badge: p.badge || '' });
+                          }}
+                          disabled={['pistachio-milk', 'cold-boost', 'cold-coffee'].includes(p.id)}
+                          className="px-3 py-1.5 bg-white/5 text-white/80 text-[10px] font-bold uppercase rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => setProductToDelete(p.id)}
+                          disabled={['pistachio-milk', 'cold-boost', 'cold-coffee'].includes(p.id)}
+                          className="px-3 py-1.5 bg-red-500/10 text-red-400 text-[10px] font-bold uppercase rounded hover:bg-red-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
         )}
-
       </div>
+
+      {/* Custom Confirm Modal for Reviews */}
+      {reviewToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Delete Feedback?</h3>
+            <p className="text-sm text-text-secondary mb-6">
+              Are you sure you want to delete this feedback? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setReviewToDelete(null)}
+                className="px-4 py-2 text-sm font-bold text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const id = reviewToDelete;
+                  setReviewToDelete(null);
+                  try {
+                    const { deleteReview } = await import('../lib/data-service');
+                    await deleteReview(id);
+                    showToast('Feedback deleted.', 'success');
+                  } catch (err) {
+                    showToast('Failed to delete feedback.', 'error');
+                  }
+                }}
+                className="px-4 py-2 text-sm font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirm Modal for Products */}
+      {productToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">Delete Product?</h3>
+            <p className="text-sm text-text-secondary mb-6">
+              Are you sure you want to delete this product? This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setProductToDelete(null)}
+                className="px-4 py-2 text-sm font-bold text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const id = productToDelete;
+                  setProductToDelete(null);
+                  try {
+                    const { deleteProduct } = await import('../lib/data-service');
+                    await deleteProduct(id);
+                    showToast('Product deleted.', 'success');
+                  } catch (err) {
+                    showToast('Failed to delete product.', 'error');
+                  }
+                }}
+                className="px-4 py-2 text-sm font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Product Modal */}
+      {productToEdit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#111] border border-white/10 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-6">Edit Product</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-white/60 uppercase block mb-2">Product Name *</label>
+                <input 
+                  type="text" 
+                  value={editProductForm.name} 
+                  onChange={e => setEditProductForm({...editProductForm, name: e.target.value})} 
+                  maxLength={60} 
+                  className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-white/60 uppercase block mb-2">Description</label>
+                <textarea 
+                  value={editProductForm.description} 
+                  onChange={e => setEditProductForm({...editProductForm, description: e.target.value})} 
+                  maxLength={200} 
+                  className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" 
+                  rows={3} 
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-white/60 uppercase block mb-2">Badge Text (Optional)</label>
+                <input 
+                  type="text" 
+                  value={editProductForm.badge} 
+                  onChange={e => setEditProductForm({...editProductForm, badge: e.target.value})} 
+                  maxLength={25} 
+                  className="w-full bg-black border border-white/10 rounded-lg px-4 py-3 text-white text-sm" 
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                onClick={() => setProductToEdit(null)}
+                className="px-4 py-2 text-sm font-bold text-white hover:bg-white/10 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const { updateProduct } = await import('../lib/data-service');
+                    await updateProduct(productToEdit.id, {
+                      name: editProductForm.name,
+                      description: editProductForm.description,
+                      badge: editProductForm.badge || ''
+                    });
+                    setProductToEdit(null);
+                    showToast('Product updated successfully.', 'success');
+                  } catch (err) {
+                    console.error(err);
+                    showToast('Failed to update product.', 'error');
+                  }
+                }}
+                disabled={!editProductForm.name}
+                className="px-4 py-2 text-sm font-bold bg-white text-black hover:bg-[#D4AF37] rounded-lg transition-colors disabled:opacity-50"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

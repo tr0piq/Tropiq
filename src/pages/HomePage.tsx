@@ -1,19 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
-import { getProducts, subscribeToProducts } from '../lib/data-service';
+import { getProducts, subscribeToProducts, subscribeToProductAvailability } from '../lib/data-service';
 import type { Product } from '../lib/data-service';
 import ReviewsMarquee from '../components/ReviewsMarquee';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>(getProducts());
+  const [availableProductIds, setAvailableProductIds] = useState<string[] | null>(null);
+
+  const { scrollYProgress } = useScroll();
+  const yGrid = useTransform(scrollYProgress, [0, 1], ['0%', '30%']);
+  const yGlow1 = useTransform(scrollYProgress, [0, 1], ['0%', '100%']);
+  const yGlow2 = useTransform(scrollYProgress, [0, 1], ['0%', '-100%']);
 
   useEffect(() => {
     const unsub = subscribeToProducts((ps) => setProducts(ps));
-    return () => unsub();
+    const unsubAvailability = subscribeToProductAvailability((ids) => setAvailableProductIds(ids));
+    return () => { unsub(); unsubAvailability(); };
   }, []);
+
+  const visibleProducts = products.filter(p => availableProductIds === null ? true : availableProductIds.includes(p.id));
 
   const handleVoteClick = () => {
     navigate('/vote');
@@ -21,11 +30,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background relative pt-36 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-      <div className="minimal-grid-bg fixed inset-0 pointer-events-none opacity-50" />
+      <motion.div style={{ y: yGrid }} className="minimal-grid-bg absolute inset-0 pointer-events-none opacity-50" />
       
       {/* Cinematic Ambient Glows */}
-      <div className="ambient-glow w-[800px] h-[800px] bg-[#D4AF37] top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5" />
-      <div className="ambient-glow w-[600px] h-[600px] bg-[#4ade80] bottom-0 right-0 opacity-5" />
+      <motion.div style={{ y: yGlow1 }} className="ambient-glow absolute w-[800px] h-[800px] bg-[#D4AF37] top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5" />
+      <motion.div style={{ y: yGlow2 }} className="ambient-glow absolute w-[600px] h-[600px] bg-[#4ade80] bottom-0 right-0 opacity-5" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         
@@ -56,7 +65,7 @@ export default function HomePage() {
 
         {/* Cinematic Product Showcase */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {products.map((product, index) => (
+          {visibleProducts.map((product, index) => (
             <motion.div 
               key={product.id}
               initial={{ opacity: 0, y: 40 }} 
