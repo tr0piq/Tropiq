@@ -459,17 +459,20 @@ export default function AdminDashboardPage() {
                 {products.map(p => {
                   const isAvailable = availableProductIds === null ? true : availableProductIds.includes(p.id);
                   return (
-                    <div key={p.id} className="flex items-center gap-4 bg-black border border-white/5 p-4 rounded-xl">
-                      <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded object-cover" />
-                      <div className="flex-1">
-                        <p className="font-bold text-white flex items-center gap-2">
-                          {p.name}
-                          {p.badge && <span className="bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">{p.badge}</span>}
-                        </p>
-                        <p className="text-xs text-text-muted truncate max-w-xs">{p.description}</p>
+                    <div key={p.id} className="flex flex-col xl:flex-row xl:items-center gap-4 bg-black border border-white/5 p-4 rounded-xl overflow-hidden">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <img src={p.imageUrl} alt={p.name} className="w-12 h-12 rounded object-cover shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white flex flex-wrap items-center gap-2">
+                            {p.name}
+                            {p.badge && <span className="bg-[#D4AF37] text-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">{p.badge}</span>}
+                          </p>
+                          <p className="text-xs text-text-muted truncate">{p.description}</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 border-l border-white/10 pl-4">
-                        <label className="text-xs font-bold text-text-muted uppercase cursor-pointer flex items-center gap-2">
+                      
+                      <div className="flex items-center gap-4 xl:border-l xl:border-white/10 xl:pl-4 pt-3 xl:pt-0 border-t xl:border-t-0 border-white/10 flex-wrap shrink-0">
+                        <label className="text-[10px] font-bold text-text-muted uppercase cursor-pointer flex items-center gap-2">
                           <input 
                             type="checkbox" 
                             checked={isAvailable}
@@ -501,27 +504,26 @@ export default function AdminDashboardPage() {
                           />
                           Available Today
                         </label>
-                      </div>
-                      
-                      {/* Actions */}
-                      <div className="flex items-center gap-2 border-l border-white/10 pl-4">
-                        <button
-                          onClick={() => {
-                            setProductToEdit(p);
-                            setEditProductForm({ name: p.name, description: p.description, badge: p.badge || '' });
-                          }}
-                          disabled={['pistachio-milk', 'cold-boost', 'cold-coffee'].includes(p.id)}
-                          className="px-3 py-1.5 bg-white/5 text-white/80 text-[10px] font-bold uppercase rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => setProductToDelete(p.id)}
-                          disabled={['pistachio-milk', 'cold-boost', 'cold-coffee'].includes(p.id)}
-                          className="px-3 py-1.5 bg-red-500/10 text-red-400 text-[10px] font-bold uppercase rounded hover:bg-red-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                          Delete
-                        </button>
+                        
+                        <div className="flex items-center gap-2 border-l border-white/10 pl-4">
+                          <button
+                            onClick={() => {
+                              setProductToEdit(p);
+                              setEditProductForm({ name: p.name, description: p.description, badge: p.badge || '' });
+                            }}
+                            disabled={['pistachio-milk', 'cold-boost', 'cold-coffee'].includes(p.id)}
+                            className="px-3 py-1.5 bg-white/5 text-white/80 text-[10px] font-bold uppercase rounded hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setProductToDelete(p.id)}
+                            disabled={['pistachio-milk', 'cold-boost', 'cold-coffee'].includes(p.id)}
+                            className="px-3 py-1.5 bg-red-500/10 text-red-400 text-[10px] font-bold uppercase rounded hover:bg-red-500/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
